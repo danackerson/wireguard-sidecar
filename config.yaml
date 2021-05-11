@@ -1,0 +1,36 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
+# TEMPLATE-TODO: change this example to suit your needs.
+# If you don't need a config, you can remove the file entirely.
+# It ties in to the example _on_config_changed handler in src/charm.py
+#
+# Learn more about config at: https://juju.is/docs/sdk/config
+
+options:
+  peers:
+    default: "1,2,3,4"
+    description: >
+      If set to a number or a list of strings separated by comma, the container
+      will run in SERVER mode and the necessary server and peer/client confs
+      will be generated. The peer/client configs will also be saved in text and
+      png format under /config/peerX in case PEERS is a variable and an integer
+      or /config/peer_X in case a list of names was provided instead of an
+      integer.
+    type: string
+  serverurl:
+    default: ""
+    description:
+    type: string
+  serverport:
+    default: ""
+    description:
+    type: string
+  internal_subnet:
+    default: ""
+    description:
+    type: string
+  peerdns:
+    default: ""
+    description:
+    type: string

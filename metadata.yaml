@@ -1,0 +1,31 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: wireguard-sidecar
+description: |
+  A basic demonstration charm that allows the user to configure a Wireguard instance
+  as server (prepared to host client connections) or as a client connecting
+  to a single host server instance.
+summary: |
+  Wireguard server/client application as sidecar charm demonstration.
+
+containers:
+  wireguard:
+    resource: wireguard-image
+    mounts:
+      - storage: client-config
+        location: /etc/wireguard
+      - storage: kernel-modules
+        location: /var/lib/modules
+
+storage:
+  client-config:
+    type: filesystem
+    location: /tmp/wireguard
+  kernel-modules:
+    type: filesystem
+    location: /var/lib/modules
+
+resources:
+  wireguard-image:
+    type: oci-image
+    description: OCI image for wireguard (linuxserver/wireguard || cmulk/wireguard-docker:alpine)
