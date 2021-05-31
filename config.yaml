@@ -8,29 +8,12 @@
 # Learn more about config at: https://juju.is/docs/sdk/config
 
 options:
-  peers:
-    default: "1,2,3,4"
+  config_file_b64:
+    default: ""
     description: >
-      If set to a number or a list of strings separated by comma, the container
-      will run in SERVER mode and the necessary server and peer/client confs
-      will be generated. The peer/client configs will also be saved in text and
-      png format under /config/peerX in case PEERS is a variable and an integer
-      or /config/peer_X in case a list of names was provided instead of an
-      integer.
+      Wireguard configuration file (see #TODO for more details).
     type: string
-  serverurl:
-    default: ""
+  server_port:
+    default: 52711
     description:
-    type: string
-  serverport:
-    default: ""
-    description:
-    type: string
-  internal_subnet:
-    default: ""
-    description:
-    type: string
-  peerdns:
-    default: ""
-    description:
-    type: string
+    type: int

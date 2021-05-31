@@ -12,10 +12,11 @@ develop a new k8s charm using the Operator Framework:
     https://discourse.charmhub.io/t/4208
 """
 
+import base64
 import logging
 
 import kubernetes
-from ops.charm import CharmBase, InstallEvent
+from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
@@ -41,14 +42,19 @@ class WireguardSidecarCharm(CharmBase):
 
     def _check_patched(self) -> bool:
         """Slightly naive check to see if the StatefulSet has already been patched"""
-        # Auth with the K8s api to check if the StatefulSet is already patched
         self.k8s_auth()
         # Get an API client
         cl = kubernetes.client.ApiClient()
         apps_api = kubernetes.client.AppsV1Api(cl)
         statefulset = apps_api.read_namespaced_stateful_set(
             name=self.app.name, namespace=self.model.name)
-        return statefulset.spec.template.spec.containers[1].security_context.privileged
+
+        patched = \
+            statefulset.spec.template.spec.containers[1].ports is not None and \
+            statefulset.spec.template.spec.containers[1].ports[0].container_port == self.model.config["server_port"] and \
+            statefulset.spec.template.spec.containers[1].security_context.privileged
+
+        return patched
 
     def _on_config_changed(self, event) -> None:
         if not self._check_patched():
@@ -62,6 +68,12 @@ class WireguardSidecarCharm(CharmBase):
         if plan.services != layer["services"]:
             container.add_layer("wireguard", layer, combine=True)
 
+            wireguardConfigB64 = self.model.config["config_file_b64"]
+            decodedBytes = base64.b64decode(wireguardConfigB64)
+            # TODO: find serverport from decoded config and set in self
+            wireguardConfig = str(decodedBytes, "utf-8")
+            container.push("/etc/wireguard/wg0.conf", wireguardConfig, make_dirs=True)
+
             if container.get_service(SERVICE).is_running():
                 container.stop(SERVICE)
 
@@ -70,12 +82,6 @@ class WireguardSidecarCharm(CharmBase):
 
         self.app.status = ActiveStatus()
         self.unit.status = ActiveStatus()
-
-        # TODO: attempt to read-in /tmp/wg0.conf from disk and mount in container
-        clientConfig = ""
-        if clientConfig != "":
-            logger.info("ADDING wg0.conf layer...")
-            container.push("/config/wg0.conf", clientConfig, make_dirs=True)
 
     def _wireguard_layer(self) -> dict:
         return {
@@ -88,7 +94,7 @@ class WireguardSidecarCharm(CharmBase):
                     "command": "/scripts/run",
                     "startup": "enabled",
                     "environment": {
-                        "PEERS": self.model.config["peers"]
+                        "server_port": self.model.config["server_port"]
                     },
                 }
             },
@@ -105,15 +111,14 @@ class WireguardSidecarCharm(CharmBase):
 
         statefulset = apps_api.read_namespaced_stateful_set(
             name=self.app.name, namespace=self.model.name)
-        statefulset.spec.template.spec.containers[1].security_context.privileged = \
-            True
+        statefulset.spec.template.spec.containers[1].security_context.privileged = True
+        statefulset.spec.template.spec.containers[1].ports = \
+            [kubernetes.client.V1ContainerPort(container_port=int(self.model.config["server_port"]))]
         logger.info(statefulset.spec.template.spec.containers[1].env)
 
         api_response = apps_api.patch_namespaced_stateful_set(
             name=self.app.name, namespace=self.model.name, body=statefulset)
         logger.info("Patched statefulset response = %s" % str(api_response.status))
-        privileged = statefulset.spec.template.spec.containers[1].security_context.privileged
-        logger.info(f"CAPS: {privileged}\n")
 
     def k8s_auth(self):
         """Authenticate to kubernetes."""
@@ -136,4 +141,4 @@ class WireguardSidecarCharm(CharmBase):
 
 
 if __name__ == "__main__":
-    main(WireguardSidecarCharm)
+    main(WireguardSidecarCharm, use_juju_for_storage=True)

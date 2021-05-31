@@ -1,7 +1,7 @@
 venv/
 build/
 *.charm
-
+wg0.conf
 .coverage
 __pycache__/
 *.py[cod]

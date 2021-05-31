@@ -11,19 +11,6 @@ summary: |
 containers:
   wireguard:
     resource: wireguard-image
-    mounts:
-      - storage: client-config
-        location: /etc/wireguard
-      - storage: kernel-modules
-        location: /var/lib/modules
-
-storage:
-  client-config:
-    type: filesystem
-    location: /tmp/wireguard
-  kernel-modules:
-    type: filesystem
-    location: /var/lib/modules
 
 resources:
   wireguard-image:
