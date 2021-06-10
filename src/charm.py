@@ -52,6 +52,7 @@ class WireguardSidecarCharm(CharmBase):
         patched = \
             statefulset.spec.template.spec.containers[1].ports is not None and \
             statefulset.spec.template.spec.containers[1].ports[0].container_port == self.model.config["server_port"] and \
+            statefulset.spec.template.spec.containers[1].ports[0].protocol == "UDP" and \
             statefulset.spec.template.spec.containers[1].security_context.privileged
 
         return patched
@@ -70,7 +71,6 @@ class WireguardSidecarCharm(CharmBase):
 
             wireguardConfigB64 = self.model.config["config_file_b64"]
             decodedBytes = base64.b64decode(wireguardConfigB64)
-            # TODO: find serverport from decoded config and set in self
             wireguardConfig = str(decodedBytes, "utf-8")
             container.push("/etc/wireguard/wg0.conf", wireguardConfig, make_dirs=True)
 
@@ -113,7 +113,7 @@ class WireguardSidecarCharm(CharmBase):
             name=self.app.name, namespace=self.model.name)
         statefulset.spec.template.spec.containers[1].security_context.privileged = True
         statefulset.spec.template.spec.containers[1].ports = \
-            [kubernetes.client.V1ContainerPort(container_port=int(self.model.config["server_port"]))]
+            [kubernetes.client.V1ContainerPort(protocol="UDP", container_port=int(self.model.config["server_port"]))]
         logger.info(statefulset.spec.template.spec.containers[1].env)
 
         api_response = apps_api.patch_namespaced_stateful_set(
