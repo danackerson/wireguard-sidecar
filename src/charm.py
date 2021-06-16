@@ -4,14 +4,6 @@
 #
 # Learn more at: https://juju.is/docs/sdk
 
-"""Charm the service.
-
-Refer to the following post for a quick-start guide that will help you
-develop a new k8s charm using the Operator Framework:
-
-    https://discourse.charmhub.io/t/4208
-"""
-
 import base64
 import logging
 
@@ -25,8 +17,6 @@ SERVICE = "wireguard"
 
 
 class WireguardSidecarCharm(CharmBase):
-    """Charm the service."""
-
     _authed = False
 
     def __init__(self, *args):
@@ -41,7 +31,6 @@ class WireguardSidecarCharm(CharmBase):
             container.start("wireguard")
 
     def _check_patched(self) -> bool:
-        """Slightly naive check to see if the StatefulSet has already been patched"""
         self.k8s_auth()
         # Get an API client
         cl = kubernetes.client.ApiClient()
