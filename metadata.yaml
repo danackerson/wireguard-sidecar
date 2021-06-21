@@ -13,4 +13,6 @@ containers:
 resources:
   wireguard-image:
     type: oci-image
-    description: OCI image for wireguard (cmulk/wireguard-docker:alpine)
+    description: OCI image for wireguard
+    auto-fetch: true
+    upstream-source: 'cmulk/wireguard-docker:alpine'

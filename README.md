@@ -16,7 +16,7 @@ Pebble charms require Juju 2.9.
 ### Download and initialize your Sidecar charm:
 
     sudo snap install charmcraft --beta
-    mkdir wireguard-sidecar && cd wireguard-widecar/
+    mkdir wireguard-sidecar && cd wireguard-sidecar/
     charmcraft init
 
 ### Create and activate a virtualenv with the development requirements:
