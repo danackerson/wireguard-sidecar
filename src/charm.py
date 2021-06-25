@@ -8,9 +8,11 @@ import base64
 import logging
 
 import kubernetes
+from kubernetes.client.rest import ApiException
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, ModelError
+from ops.pebble import APIError, ConnectionError
 
 logger = logging.getLogger(__name__)
 SERVICE = "wireguard"
@@ -25,10 +27,14 @@ class WireguardSidecarCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
     def _on_pebble_ready(self, event):
-        container = event.workload
-        if not container.get_service("wireguard").is_running():
-            logger.info("Starting wireguard")
-            container.start("wireguard")
+        try:
+            container = event.workload
+            if not container.get_service("wireguard").is_running():
+                logger.info("Starting wireguard")
+                container.start("wireguard")
+        except ModelError as error:
+            logger.debug(f"The Pebble API is not ready yet. Error message: {error}")
+            event.defer()
 
     def _check_patched(self) -> bool:
         self.k8s_auth()
@@ -38,11 +44,12 @@ class WireguardSidecarCharm(CharmBase):
         statefulset = apps_api.read_namespaced_stateful_set(
             name=self.app.name, namespace=self.model.name)
 
+        app_container = statefulset.spec.template.spec.containers[1]
         patched = \
-            statefulset.spec.template.spec.containers[1].ports is not None and \
-            statefulset.spec.template.spec.containers[1].ports[0].container_port == self.model.config["server_port"] and \
-            statefulset.spec.template.spec.containers[1].ports[0].protocol == "UDP" and \
-            statefulset.spec.template.spec.containers[1].security_context.privileged
+            app_container.ports is not None and \
+            app_container.ports[0].container_port == self.model.config["server_port"] and \
+            app_container.ports[0].protocol == "UDP" and \
+            app_container.security_context.privileged
 
         return patched
 
@@ -52,8 +59,14 @@ class WireguardSidecarCharm(CharmBase):
             self.unit.status = MaintenanceStatus("waiting for changes to apply")
 
         container = self.unit.get_container(SERVICE)
-        layer = self._wireguard_layer()
+        try:
+            plan = container.get_plan().to_dict()
+        except (APIError, ConnectionError) as error:
+            logger.debug(f"The Pebble API is not ready yet. Error message: {error}")
+            event.defer()
+            return
 
+        layer = self._wireguard_layer()
         plan = container.get_plan()
         if plan.services != layer["services"]:
             container.add_layer("wireguard", layer, combine=True)
@@ -100,10 +113,13 @@ class WireguardSidecarCharm(CharmBase):
 
         statefulset = apps_api.read_namespaced_stateful_set(
             name=self.app.name, namespace=self.model.name)
-        statefulset.spec.template.spec.containers[1].security_context.privileged = True
-        statefulset.spec.template.spec.containers[1].ports = \
-            [kubernetes.client.V1ContainerPort(protocol="UDP", container_port=int(self.model.config["server_port"]))]
-        logger.info(statefulset.spec.template.spec.containers[1].env)
+        app_container = statefulset.spec.template.spec.containers[1]
+
+        app_container.security_context.privileged = True
+        app_container.ports = \
+            [kubernetes.client.V1ContainerPort(
+             protocol="UDP", container_port=int(self.model.config["server_port"]))]
+        logger.info(app_container.env)
 
         api_response = apps_api.patch_namespaced_stateful_set(
             name=self.app.name, namespace=self.model.name, body=statefulset)
@@ -120,7 +136,7 @@ class WireguardSidecarCharm(CharmBase):
         auth_api = kubernetes.client.RbacAuthorizationV1Api(kubernetes.client.ApiClient())
         try:
             auth_api.read_namespaced_role(namespace=self.model.name, name=self.app.name)
-        except:
+        except ApiException:
             # If we can't read a namespaced role, we definitely don't have enough permissions
             self.unit.status = BlockedStatus("Run juju trust on this application to continue")
             return False
@@ -130,4 +146,4 @@ class WireguardSidecarCharm(CharmBase):
 
 
 if __name__ == "__main__":
-    main(WireguardSidecarCharm, use_juju_for_storage=True)
+    main(WireguardSidecarCharm)
